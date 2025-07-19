@@ -2,13 +2,14 @@ import org.gradle.configurationcache.extensions.capitalized
 
 plugins {
     id("com.android.application")
+    kotlin("android")
     id("com.github.ben-manes.versions")
     id("com.github.triplet.play") version "3.7.0"
 }
 
 dependencies {
     implementation("eu.chainfire:libsuperuser:1.1.1")
-    implementation("com.google.android.material:material:1.8.0")
+    implementation("com.google.android.material:material:1.12.0")
     implementation("com.google.code.gson:gson:2.10.1")
     implementation("org.mindrot:jbcrypt:0.4")
     implementation("com.google.guava:guava:32.1.3-android")
@@ -31,13 +32,15 @@ dependencies {
 android {
     val ndkVersionShared = rootProject.extra.get("ndkVersionShared")
     // Changes to these values need to be reflected in `../docker/Dockerfile`
-    compileSdk = 34
-    buildToolsVersion = "34.0.0"
+    compileSdk = 36
+    buildToolsVersion = "36.0.0"
     ndkVersion = "${ndkVersionShared}"
 
+    namespace = "com.nutomic.syncthingandroid"
     buildFeatures {
         dataBinding = true
         viewBinding = true
+        buildConfig = true
     }
 
     defaultConfig {
@@ -64,7 +67,6 @@ android {
             applicationIdSuffix = ".debug"
             isDebuggable = true
             isJniDebuggable = true
-            isRenderscriptDebuggable = true
             isMinifyEnabled = false
         }
         getByName("release") {
@@ -81,7 +83,7 @@ android {
 
     // Otherwise libsyncthing.so doesn't appear where it should in installs
     // based on app bundles, and thus nothing works.
-    packagingOptions {
+    packaging {
         jniLibs {
             useLegacyPackaging = true
         }
@@ -114,7 +116,10 @@ tasks.register<Delete>("deleteUnsupportedPlayTranslations") {
 
 project.afterEvaluate {
     android.buildTypes.forEach {
-        tasks.named("merge${it.name.capitalized()}JniLibFolders") {
+        tasks.named("merge${
+            it.name
+                .replaceFirstChar { n -> if (n.isLowerCase()) n.titlecase() else n.toString() }
+        }JniLibFolders") {
             dependsOn(":syncthing:buildNative")
         }
     }

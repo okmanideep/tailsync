@@ -110,24 +110,21 @@ public class FolderActivity extends SyncthingActivity
             new CompoundButton.OnCheckedChangeListener() {
         @Override
         public void onCheckedChanged(CompoundButton view, boolean isChecked) {
-            switch (view.getId()) {
-                case R.id.fileWatcher:
-                    mFolder.fsWatcherEnabled = isChecked;
-                    mFolderNeedsToUpdate = true;
-                    break;
-                case R.id.folderPause:
-                    mFolder.paused = isChecked;
-                    mFolderNeedsToUpdate = true;
-                    break;
-                case R.id.device_toggle:
-                    Device device = (Device) view.getTag();
-                    if (isChecked) {
-                        mFolder.addDevice(device.deviceID);
-                    } else {
-                        mFolder.removeDevice(device.deviceID);
-                    }
-                    mFolderNeedsToUpdate = true;
-                    break;
+            int id = view.getId();
+            if (id == R.id.fileWatcher) {
+                mFolder.fsWatcherEnabled = isChecked;
+                mFolderNeedsToUpdate = true;
+            } else if (id == R.id.folderPause) {
+                mFolder.paused = isChecked;
+                mFolderNeedsToUpdate = true;
+            } else if (id == R.id.device_toggle) {
+                Device device = (Device) view.getTag();
+                if (isChecked) {
+                    mFolder.addDevice(device.deviceID);
+                } else {
+                    mFolder.removeDevice(device.deviceID);
+                }
+                mFolderNeedsToUpdate = true;
             }
         }
     };
@@ -415,46 +412,45 @@ public class FolderActivity extends SyncthingActivity
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        switch (item.getItemId()) {
-            case R.id.create:
-                if (TextUtils.isEmpty(mFolder.id)) {
-                    Toast.makeText(this, R.string.folder_id_required, Toast.LENGTH_LONG)
-                            .show();
-                    return true;
-                }
-                if (TextUtils.isEmpty(mFolder.path)) {
-                    Toast.makeText(this, R.string.folder_path_required, Toast.LENGTH_LONG)
-                            .show();
-                    return true;
-                }
-                if (mFolderUri != null) {
-                    /**
-                     * Normally, syncthing takes care of creating the ".stfolder" marker.
-                     * This fails on newer android versions if the syncthing binary only has
-                     * readonly access on the path and the user tries to configure a
-                     * sendonly folder. To fix this, we'll precreate the marker using java code.
-                     * We also create an empty file in the marker directory, to hopefully keep
-                     * it alive in the face of overzealous disk cleaner apps.
-                     */
-                    DocumentFile dfFolder = DocumentFile.fromTreeUri(this, mFolderUri);
-                    if (dfFolder != null) {
-                        Log.v(TAG, "Creating new directory " + mFolder.path + File.separator + FOLDER_MARKER_NAME);
-                        DocumentFile marker = dfFolder.createDirectory(FOLDER_MARKER_NAME);
-                        marker.createFile("text/plain", "empty");
-                    }
-                }
-                getApi().createFolder(mFolder);
-                finish();
+        int itemId = item.getItemId();
+        if (itemId == R.id.create) {
+            if (TextUtils.isEmpty(mFolder.id)) {
+                Toast.makeText(this, R.string.folder_id_required, Toast.LENGTH_LONG)
+                        .show();
                 return true;
-            case R.id.remove:
-                showDeleteDialog();
+            }
+            if (TextUtils.isEmpty(mFolder.path)) {
+                Toast.makeText(this, R.string.folder_path_required, Toast.LENGTH_LONG)
+                        .show();
                 return true;
-            case android.R.id.home:
-                onBackPressed();
-                return true;
-            default:
-                return super.onOptionsItemSelected(item);
+            }
+            if (mFolderUri != null) {
+                /**
+                 * Normally, syncthing takes care of creating the ".stfolder" marker.
+                 * This fails on newer android versions if the syncthing binary only has
+                 * readonly access on the path and the user tries to configure a
+                 * sendonly folder. To fix this, we'll precreate the marker using java code.
+                 * We also create an empty file in the marker directory, to hopefully keep
+                 * it alive in the face of overzealous disk cleaner apps.
+                 */
+                DocumentFile dfFolder = DocumentFile.fromTreeUri(this, mFolderUri);
+                if (dfFolder != null) {
+                    Log.v(TAG, "Creating new directory " + mFolder.path + File.separator + FOLDER_MARKER_NAME);
+                    DocumentFile marker = dfFolder.createDirectory(FOLDER_MARKER_NAME);
+                    marker.createFile("text/plain", "empty");
+                }
+            }
+            getApi().createFolder(mFolder);
+            finish();
+            return true;
+        } else if (itemId == R.id.remove) {
+            showDeleteDialog();
+            return true;
+        } else if (itemId == android.R.id.home) {
+            onBackPressed();
+            return true;
         }
+        return super.onOptionsItemSelected(item);
     }
 
     private void showDeleteDialog(){
@@ -597,9 +593,9 @@ public class FolderActivity extends SyncthingActivity
         int height = (int) TypedValue.applyDimension(COMPLEX_UNIT_DIP, 48, getResources().getDisplayMetrics());
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(WRAP_CONTENT, height);
         int dividerInset = getResources().getDimensionPixelOffset(R.dimen.material_divider_inset);
-        int contentInset = getResources().getDimensionPixelOffset(R.dimen.abc_action_bar_content_inset_material);
-        setMarginStart(params, dividerInset);
-        setMarginEnd(params, contentInset);
+        int contentInset = getResources().getDimensionPixelOffset(R.dimen.action_bar_content_inset);
+        params.setMarginStart(dividerInset);
+        params.setMarginEnd(contentInset);
         TextView emptyView = new TextView(binding.devicesContainer.getContext());
         emptyView.setGravity(CENTER_VERTICAL);
         emptyView.setText(R.string.devices_list_empty);

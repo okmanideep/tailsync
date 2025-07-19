@@ -258,8 +258,8 @@ public class FirstStartActivity extends Activity {
     }
 
     private void setActiveBottomDot(int currentPage) {
-        int colorInactive = MaterialColors.getColor(this, R.attr.colorPrimary, Color.BLUE);
-        int colorActive = MaterialColors.getColor(this, R.attr.colorSecondary, Color.BLUE);
+        int colorInactive = MaterialColors.getColor(this, com.google.android.material.R.attr.colorPrimary, Color.BLUE);
+        int colorActive = MaterialColors.getColor(this, com.google.android.material.R.attr.colorSecondary, Color.BLUE);
         for (TextView mDot : mDots) {
             mDot.setTextColor(colorInactive);
         }
