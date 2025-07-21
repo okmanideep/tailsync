@@ -623,6 +623,13 @@ public class RestApi {
         });
     }
 
+    public void getOverallCompletionInfo(final OnResultListener1<CompletionInfo> listener) {
+        new GetRequest(mContext, mUrl, GetRequest.URI_COMPLETION, mApiKey, null, result -> {
+            CompletionInfo completionInfo = new Gson().fromJson(result, CompletionInfo.class);
+            listener.onResult(completionInfo);
+        });
+    }
+
     /**
      * Listener for {@link #getEvents}.
      */

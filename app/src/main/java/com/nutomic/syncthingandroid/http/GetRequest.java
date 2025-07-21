@@ -25,6 +25,7 @@ public class GetRequest extends ApiRequest {
     public static final String URI_DEVICEID    = "/rest/svc/deviceid";
     public static final String URI_REPORT      = "/rest/svc/report";
     public static final String URI_EVENTS      = "/rest/events";
+    public static final String URI_COMPLETION  = "/rest/db/completion";
 
     public GetRequest(Context context, URL url, String path, String apiKey,
                       @Nullable Map<String, String> params, OnSuccessListener listener) {
