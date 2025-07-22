@@ -12,15 +12,12 @@ import android.view.View;
 
 import com.nutomic.syncthingandroid.R;
 import com.nutomic.syncthingandroid.databinding.DialogLoadingBinding;
-import com.nutomic.syncthingandroid.model.RunConditionCheckResult;
 import com.nutomic.syncthingandroid.service.SyncthingService;
 import com.nutomic.syncthingandroid.service.SyncthingService.State;
 import com.nutomic.syncthingandroid.util.Util;
 
 import java.util.Collection;
 import java.util.concurrent.TimeUnit;
-
-import static com.nutomic.syncthingandroid.model.RunConditionCheckResult.*;
 
 /**
  * Handles loading/disabled dialogs.
@@ -39,7 +36,6 @@ public abstract class StateDialogActivity extends SyncthingActivity {
         super.onCreate(savedInstanceState);
         registerOnServiceConnectedListener(() -> {
                 getService().registerOnServiceStateChangeListener(this::onServiceStateChange);
-                getService().registerOnRunConditionCheckResultChange(this::onRunConditionCheckResultChange);
         });
     }
 
@@ -69,7 +65,6 @@ public abstract class StateDialogActivity extends SyncthingActivity {
         super.onDestroy();
         if (getService() != null) {
             getService().unregisterOnServiceStateChangeListener(this::onServiceStateChange);
-            getService().unregisterOnRunConditionCheckResultChange(this::onRunConditionCheckResultChange);
         }
         dismissDisabledDialog();
     }
@@ -94,12 +89,6 @@ public abstract class StateDialogActivity extends SyncthingActivity {
             case ERROR: // fallthrough
             default:
                 break;
-        }
-    }
-
-    private void onRunConditionCheckResultChange(RunConditionCheckResult result) {
-        if (mDisabledDialog != null && mDisabledDialog.isShowing()) {
-            mDisabledDialog.setMessage(getDisabledDialogMessage());
         }
     }
 
@@ -129,19 +118,6 @@ public abstract class StateDialogActivity extends SyncthingActivity {
     private StringBuilder getDisabledDialogMessage() {
         StringBuilder message = new StringBuilder();
         message.append(this.getResources().getString(R.string.syncthing_disabled_message));
-        Collection<BlockerReason> reasons = getService().getCurrentRunConditionCheckResult().getBlockReasons();
-        if (!reasons.isEmpty()) {
-            message.append("\n");
-            message.append("\n");
-            message.append(this.getResources().getString(R.string.syncthing_disabled_reason_heading));
-            int count = 0;
-            for (BlockerReason reason : reasons) {
-                count++;
-                message.append("\n");
-                if (reasons.size() > 1) message.append(count + ". ");
-                message.append(this.getString(reason.getResId()));
-            }
-        }
         return message;
     }
 

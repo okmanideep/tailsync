@@ -13,7 +13,7 @@ import com.google.common.io.Files;
 import com.nutomic.syncthingandroid.R;
 import com.nutomic.syncthingandroid.SyncthingApp;
 import com.nutomic.syncthingandroid.http.PollWebGuiAvailableTask;
-import com.nutomic.syncthingandroid.model.RunConditionCheckResult;
+
 import com.nutomic.syncthingandroid.util.ConfigXml;
 import com.nutomic.syncthingandroid.util.PermissionUtil;
 
@@ -23,7 +23,6 @@ import java.lang.ref.WeakReference;
 import java.net.URL;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.concurrent.atomic.AtomicReference;
 
 import javax.inject.Inject;
 
@@ -51,9 +50,6 @@ public class SyncthingService extends Service {
      */
     public static final String ACTION_RESET_DELTAS =
             "com.nutomic.syncthingandroid.service.SyncthingService.RESET_DELTAS";
-
-    public static final String ACTION_REFRESH_NETWORK_INFO =
-            "com.nutomic.syncthingandroid.service.SyncthingService.REFRESH_NETWORK_INFO";
 
     /**
      * Intent action to permanently ignore a device connection request.
@@ -113,9 +109,6 @@ public class SyncthingService extends Service {
         void onServiceStateChange(State currentState);
     }
 
-    public interface OnRunConditionCheckResultListener {
-        void onRunConditionCheckResultChanged(RunConditionCheckResult result);
-    }
 
     /**
      * Indicates the current state of SyncthingService and of Syncthing itself.
@@ -142,20 +135,17 @@ public class SyncthingService extends Service {
      * {@link onStartCommand}.
      */
     private State mCurrentState = State.DISABLED;
-    private AtomicReference<RunConditionCheckResult> mCurrentCheckResult = new AtomicReference<>(RunConditionCheckResult.SHOULD_RUN);
 
     private ConfigXml mConfig;
     private @Nullable PollWebGuiAvailableTask mPollWebGuiAvailableTask = null;
     private @Nullable RestApi mApi = null;
     private @Nullable EventProcessor mEventProcessor = null;
-    private @Nullable RunConditionMonitor mRunConditionMonitor = null;
     private @Nullable SyncthingRunnable mSyncthingRunnable = null;
     private StartupTask mStartupTask = null;
     private Thread mSyncthingRunnableThread = null;
     private Handler mHandler;
 
     private final HashSet<OnServiceStateChangeListener> mOnServiceStateChangeListeners = new HashSet<>();
-    private final HashSet<OnRunConditionCheckResultListener> mOnRunConditionCheckResultListeners = new HashSet<>();
     private final SyncthingServiceBinder mBinder = new SyncthingServiceBinder(this);
 
     @Inject NotificationHandler mNotificationHandler;
@@ -165,11 +155,6 @@ public class SyncthingService extends Service {
      * Object that must be locked upon accessing mCurrentState
      */
     private final Object mStateLock = new Object();
-
-    /**
-     * Stores the result of the last should run decision received by OnDeviceStateChangedListener.
-     */
-    private boolean mLastDeterminedShouldRun = false;
 
     /**
      * True if a service {@link onDestroy} was requested while syncthing is starting,
@@ -219,26 +204,27 @@ public class SyncthingService extends Service {
             return START_NOT_STICKY;
         }
 
-        /**
-         * Send current service state to listening endpoints.
-         * This is required that components know about the service State.DISABLED
-         * if RunConditionMonitor does not send a "shouldRun = true" callback
-         * to start the binary according to preferences shortly after its creation.
-         * See {@link mLastDeterminedShouldRun} defaulting to "false".
-         */
         if (mCurrentState == State.DISABLED) {
             synchronized(mStateLock) {
                 onServiceStateChange(mCurrentState);
             }
         }
-        if (mRunConditionMonitor == null) {
-            /**
-             * Instantiate the run condition monitor on first onStartCommand and
-             * enable callback on run condition change affecting the final decision to
-             * run/terminate syncthing. After initial run conditions are collected
-             * the first decision is sent to {@link onUpdatedShouldRunDecision}.
-             */
-            mRunConditionMonitor = new RunConditionMonitor(SyncthingService.this, this::onUpdatedShouldRunDecision);
+        // Start syncthing.
+        switch (mCurrentState) {
+            case DISABLED:
+            case INIT:
+                // HACK: Make sure there is no syncthing binary left running from an improper
+                // shutdown (eg Play Store update).
+                shutdown(State.INIT, () -> {
+                    launchStartupTask();
+                });
+                break;
+            case STARTING:
+            case ACTIVE:
+            case ERROR:
+                break;
+            default:
+                break;
         }
         mNotificationHandler.updatePersistentNotification(this);
 
@@ -257,8 +243,6 @@ public class SyncthingService extends Service {
                 new SyncthingRunnable(this, SyncthingRunnable.Command.resetdeltas).run();
                 launchStartupTask();
             });
-        } else if (ACTION_REFRESH_NETWORK_INFO.equals(intent.getAction())) {
-            mRunConditionMonitor.updateShouldRunDecision();
         } else if (ACTION_IGNORE_DEVICE.equals(intent.getAction()) && mCurrentState == State.ACTIVE) {
             // mApi is not null due to State.ACTIVE
             mApi.ignoreDevice(intent.getStringExtra(EXTRA_DEVICE_ID), intent.getStringExtra(EXTRA_DEVICE_NAME), intent.getStringExtra(EXTRA_DEVICE_ADDRESS));
@@ -271,53 +255,6 @@ public class SyncthingService extends Service {
             mApi.overrideChanges(intent.getStringExtra(EXTRA_FOLDER_ID));
         }
         return START_STICKY;
-    }
-
-    /**
-     * After run conditions monitored by {@link RunConditionMonitor} changed and
-     * it had an influence on the decision to run/terminate syncthing, this
-     * function is called to notify this class to run/terminate the syncthing binary.
-     * {@link #onServiceStateChange} is called while applying the decision change.
-     */
-    private void onUpdatedShouldRunDecision(RunConditionCheckResult result) {
-        boolean newShouldRunDecision = result.isShouldRun();
-        boolean reasonsChanged = !mCurrentCheckResult.getAndSet(result).equals(result);
-        if (reasonsChanged) {
-            onRunConditionCheckResultChange(result);
-        }
-
-        if (newShouldRunDecision != mLastDeterminedShouldRun) {
-            Log.i(TAG, "shouldRun decision changed to " + newShouldRunDecision + " according to configured run conditions.");
-            mLastDeterminedShouldRun = newShouldRunDecision;
-
-            // React to the shouldRun condition change.
-            if (newShouldRunDecision) {
-                // Start syncthing.
-                switch (mCurrentState) {
-                    case DISABLED:
-                    case INIT:
-                        // HACK: Make sure there is no syncthing binary left running from an improper
-                        // shutdown (eg Play Store update).
-                        shutdown(State.INIT, () -> {
-                            launchStartupTask();
-                        });
-                        break;
-                    case STARTING:
-                    case ACTIVE:
-                    case ERROR:
-                        break;
-                    default:
-                        break;
-                }
-            } else {
-                // Stop syncthing.
-                if (mCurrentState == State.DISABLED) {
-                    return;
-                }
-                Log.v(TAG, "Stopping syncthing");
-                shutdown(State.DISABLED, () -> {});
-            }
-        }
     }
 
     /**
@@ -473,13 +410,6 @@ public class SyncthingService extends Service {
     @Override
     public void onDestroy() {
         Log.v(TAG, "onDestroy");
-        if (mRunConditionMonitor != null) {
-            /**
-             * Shut down the OnDeviceStateChangedListener so we won't get interrupted by run
-             * condition events that occur during shutdown.
-             */
-            mRunConditionMonitor.shutdown();
-        }
         if (mNotificationHandler != null) {
             mNotificationHandler.setAppShutdownInProgress(true);
         }
@@ -558,18 +488,6 @@ public class SyncthingService extends Service {
     }
 
     /**
-     * Force re-evaluating run conditions immediately e.g. after
-     * preferences were modified by {@link SettingsActivity}.
-     */
-    public void evaluateRunConditions() {
-        if (mRunConditionMonitor == null) {
-            return;
-        }
-        Log.v(TAG, "Forced re-evaluating run conditions ...");
-        mRunConditionMonitor.updateShouldRunDecision();
-    }
-
-    /**
      * Register a listener for the syncthing API state changing.
      *
      * The listener is called immediately with the current state, and again whenever the state
@@ -613,28 +531,7 @@ public class SyncthingService extends Service {
         });
     }
 
-    public void registerOnRunConditionCheckResultChange(OnRunConditionCheckResultListener listener) {
-        listener.onRunConditionCheckResultChanged(mCurrentCheckResult.get());
-        mOnRunConditionCheckResultListeners.add(listener);
-    }
 
-    public void unregisterOnRunConditionCheckResultChange(OnRunConditionCheckResultListener listener) {
-        mOnRunConditionCheckResultListeners.remove(listener);
-    }
-
-    private void onRunConditionCheckResultChange(RunConditionCheckResult result) {
-        mHandler.post(() -> {
-            for (Iterator<OnRunConditionCheckResultListener> i = mOnRunConditionCheckResultListeners.iterator();
-                 i.hasNext(); ) {
-                OnRunConditionCheckResultListener listener = i.next();
-                if (listener != null) {
-                    listener.onRunConditionCheckResultChanged(result);
-                } else {
-                    i.remove();
-                }
-            }
-        });
-    }
 
 
     public URL getWebGuiUrl() {
@@ -643,10 +540,6 @@ public class SyncthingService extends Service {
 
     public State getCurrentState() {
         return mCurrentState;
-    }
-
-    public RunConditionCheckResult getCurrentRunConditionCheckResult() {
-        return mCurrentCheckResult.get();
     }
 
     public NotificationHandler getNotificationHandler() {

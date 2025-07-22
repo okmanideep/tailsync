@@ -10,7 +10,6 @@ import android.preference.CheckBoxPreference;
 import android.preference.EditTextPreference;
 import android.preference.ListPreference;
 import android.preference.Preference;
-import android.preference.PreferenceGroup;
 import android.preference.PreferenceFragment;
 import android.preference.PreferenceScreen;
 import androidx.annotation.NonNull;
@@ -35,12 +34,9 @@ import com.nutomic.syncthingandroid.service.RestApi;
 import com.nutomic.syncthingandroid.service.SyncthingService;
 import com.nutomic.syncthingandroid.util.Languages;
 import com.nutomic.syncthingandroid.util.Util;
-import com.nutomic.syncthingandroid.views.WifiSsidPreference;
 
 import java.lang.ref.WeakReference;
 import java.security.InvalidParameterException;
-import java.util.HashSet;
-import java.util.Set;
 
 import javax.inject.Inject;
 
@@ -77,10 +73,7 @@ public class SettingsActivity extends SyncthingActivity {
                     break;
                 }
             }
-            if (granted) {
-                this.startService(new Intent(this, SyncthingService.class)
-                        .setAction(SyncthingService.ACTION_REFRESH_NETWORK_INFO));
-            } else {
+            if (!granted) {
                 Util.getAlertDialogBuilder(this)
                         .setTitle(R.string.sync_only_wifi_ssids_location_permission_rejected_dialog_title)
                         .setMessage(R.string.sync_only_wifi_ssids_location_permission_rejected_dialog_content)
@@ -103,16 +96,6 @@ public class SettingsActivity extends SyncthingActivity {
 
         @Inject NotificationHandler mNotificationHandler;
         @Inject SharedPreferences mPreferences;
-
-        private PreferenceGroup    mCategoryRunConditions;
-        private CheckBoxPreference mRunConditions;
-        private CheckBoxPreference mStartServiceOnBoot;
-        private ListPreference     mPowerSource;
-        private CheckBoxPreference mRunOnMobileData;
-        private CheckBoxPreference mRunOnWifi;
-        private CheckBoxPreference mRunOnMeteredWifi;
-        private WifiSsidPreference mWifiSsidWhitelist;
-        private CheckBoxPreference mRunInFlightMode;
 
         private Preference         mCategorySyncthingOptions;
         private EditTextPreference mDeviceName;
@@ -146,12 +129,6 @@ public class SettingsActivity extends SyncthingActivity {
 
         private Boolean mPendingConfig = false;
 
-        /**
-         * Indicates if run conditions were changed and need to be
-         * re-evaluated when the user leaves the preferences screen.
-         */
-        private Boolean mPendingRunConditions = false;
-
         @Override
         public void onCreate(@Nullable Bundle savedInstanceState) {
             super.onCreate(savedInstanceState);
@@ -170,22 +147,6 @@ public class SettingsActivity extends SyncthingActivity {
 
             addPreferencesFromResource(R.xml.app_settings);
             PreferenceScreen screen = getPreferenceScreen();
-            mRunConditions =
-                    (CheckBoxPreference) findPreference(Constants.PREF_RUN_CONDITIONS);
-            mStartServiceOnBoot =
-                    (CheckBoxPreference) findPreference(Constants.PREF_START_SERVICE_ON_BOOT);
-            mPowerSource =
-                    (ListPreference) findPreference(Constants.PREF_POWER_SOURCE);
-            mRunOnMobileData =
-                    (CheckBoxPreference) findPreference(Constants.PREF_RUN_ON_WIFI);
-            mRunOnWifi =
-                    (CheckBoxPreference) findPreference(Constants.PREF_RUN_ON_WIFI);
-            mRunOnMeteredWifi =
-                    (CheckBoxPreference) findPreference(Constants.PREF_RUN_ON_METERED_WIFI);
-            mWifiSsidWhitelist =
-                    (WifiSsidPreference) findPreference(Constants.PREF_WIFI_SSID_WHITELIST);
-            mRunInFlightMode =
-                    (CheckBoxPreference) findPreference(Constants.PREF_RUN_IN_FLIGHT_MODE);
 
             ListPreference languagePref = (ListPreference) findPreference(Languages.PREFERENCE_LANGUAGE);
             PreferenceScreen categoryBehaviour = (PreferenceScreen) findPreference("category_behaviour");
@@ -233,19 +194,8 @@ public class SettingsActivity extends SyncthingActivity {
             mSyncthingVersion       = findPreference("syncthing_version");
             Preference appVersion   = screen.findPreference("app_version");
 
-            mRunOnMeteredWifi.setEnabled(mRunOnWifi.isChecked());
-            mWifiSsidWhitelist.setEnabled(mRunOnWifi.isChecked());
-
             mCategorySyncthingOptions = findPreference("category_syncthing_options");
             setPreferenceCategoryChangeListener(mCategorySyncthingOptions, this::onSyncthingPreferenceChange);
-            mCategoryRunConditions = (PreferenceGroup) findPreference("category_run_conditions");
-            setPreferenceCategoryChangeListener(mCategoryRunConditions, this::onRunConditionPreferenceChange);
-
-            if (!mRunConditions.isChecked()) {
-                for (int index = 1; index < mCategoryRunConditions.getPreferenceCount(); ++index) {
-                    mCategoryRunConditions.getPreference(index).setEnabled(false);
-                }
-            }
 
             exportConfig.setOnPreferenceClickListener(this);
             importConfig.setOnPreferenceClickListener(this);
@@ -266,13 +216,6 @@ public class SettingsActivity extends SyncthingActivity {
             mHttpProxyAddress.setEnabled(!(Boolean) mUseTor.isChecked());
             mHttpProxyAddress.setOnPreferenceChangeListener(this);
 
-            /* Initialize summaries */
-            screen.findPreference(Constants.PREF_POWER_SOURCE).setSummary(mPowerSource.getEntry());
-            String wifiSsidSummary = TextUtils.join(", ", mPreferences.getStringSet(Constants.PREF_WIFI_SSID_WHITELIST, new HashSet<>()));
-            screen.findPreference(Constants.PREF_WIFI_SSID_WHITELIST).setSummary(TextUtils.isEmpty(wifiSsidSummary) ?
-                getString(R.string.run_on_all_wifi_networks) :
-                getString(R.string.run_on_whitelisted_wifi_networks, wifiSsidSummary)
-            );
             handleSocksProxyPreferenceChange(screen.findPreference(Constants.PREF_SOCKS_PROXY_ADDRESS),  mPreferences.getString(Constants.PREF_SOCKS_PROXY_ADDRESS, ""));
             handleHttpProxyPreferenceChange(screen.findPreference(Constants.PREF_HTTP_PROXY_ADDRESS), mPreferences.getString(Constants.PREF_HTTP_PROXY_ADDRESS, ""));
 
@@ -369,38 +312,6 @@ public class SettingsActivity extends SyncthingActivity {
             }
         }
 
-        public boolean onRunConditionPreferenceChange(Preference preference, Object o) {
-            switch (preference.getKey()) {
-                case Constants.PREF_RUN_CONDITIONS:
-                    boolean enabled = (Boolean) o;
-                    for (int index = 1; index < mCategoryRunConditions.getPreferenceCount(); ++index) {
-                        mCategoryRunConditions.getPreference(index).setEnabled(enabled);
-                    }
-                    if (enabled) {
-                        mRunOnMeteredWifi.setEnabled(mRunOnWifi.isChecked());
-                        mWifiSsidWhitelist.setEnabled(mRunOnWifi.isChecked());
-                    }
-                    break;
-                case Constants.PREF_POWER_SOURCE:
-                    mPowerSource.setValue(o.toString());
-                    preference.setSummary(mPowerSource.getEntry());
-                    break;
-                case Constants.PREF_RUN_ON_WIFI:
-                    mRunOnMeteredWifi.setEnabled((Boolean) o);
-                    mWifiSsidWhitelist.setEnabled((Boolean) o);
-                    break;
-                case Constants.PREF_WIFI_SSID_WHITELIST:
-                    String wifiSsidSummary = TextUtils.join(", ", (Set<String>) o);
-                    preference.setSummary(TextUtils.isEmpty(wifiSsidSummary) ?
-                        getString(R.string.run_on_all_wifi_networks) :
-                        getString(R.string.run_on_whitelisted_wifi_networks, wifiSsidSummary)
-                    );
-                    break;
-            }
-            mPendingRunConditions = true;
-            return true;
-        }
-
         public boolean onSyncthingPreferenceChange(Preference preference, Object o) {
             Splitter splitter = Splitter.on(",").trimResults().omitEmptyStrings();
             switch (preference.getKey()) {
@@ -478,9 +389,6 @@ public class SettingsActivity extends SyncthingActivity {
                         mPendingConfig = false;
                     }
                 }
-                if (mPendingRunConditions) {
-                    mSyncthingService.evaluateRunConditions();
-                }
             }
             super.onStop();
         }
@@ -527,7 +435,8 @@ public class SettingsActivity extends SyncthingActivity {
                         return false;
                     if (handleHttpProxyPreferenceChange(preference, o.toString().trim())) {
                         mPendingConfig = true;
-                    } else {
+                    }
+                    else {
                         return false;
                     }
                     break;
