@@ -81,6 +81,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
 
+    kotlinOptions {
+        jvmTarget = "11"
+    }
+
     // Otherwise libsyncthing.so doesn't appear where it should in installs
     // based on app bundles, and thus nothing works.
     packaging {
