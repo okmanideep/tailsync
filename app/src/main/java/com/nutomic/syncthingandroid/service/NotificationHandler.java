@@ -98,7 +98,6 @@ public class NotificationHandler {
      * Shows, updates or hides the notification.
      */
     public void updatePersistentNotification(SyncthingService service) {
-        boolean startServiceOnBoot = mPreferences.getBoolean(Constants.PREF_START_SERVICE_ON_BOOT, false);
         State currentServiceState = service.getCurrentState();
         boolean syncthingRunning = currentServiceState == SyncthingService.State.ACTIVE ||
                 currentServiceState == SyncthingService.State.STARTING;
@@ -111,7 +110,7 @@ public class NotificationHandler {
                  * running as a foreground service. For that reason, we can use a normal
                  * notification if syncthing is DISABLED.
                  */
-                startForegroundService = startServiceOnBoot || syncthingRunning;
+                startForegroundService = syncthingRunning;
             } else {
                 /**
                  * Android 8+:
@@ -294,23 +293,5 @@ public class NotificationHandler {
 
     public void cancelRestartNotification() {
         mNotificationManager.cancel(ID_RESTART);
-    }
-
-    public void showStopSyncthingWarningNotification() {
-        final String msg = mContext.getString(R.string.appconfig_receiver_background_enabled);
-        NotificationCompat.Builder nb = getNotificationBuilder(mInfoChannel)
-                .setContentText(msg)
-                .setTicker(msg)
-                .setStyle(new NotificationCompat.BigTextStyle().bigText(msg))
-                .setContentTitle(mContext.getText(mContext.getApplicationInfo().labelRes))
-                .setSmallIcon(R.drawable.ic_stat_notify)
-                .setAutoCancel(true)
-                .setContentIntent(PendingIntent.getActivity(mContext, 0,
-                        new Intent(mContext, MainActivity.class),
-                        Constants.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT));
-
-
-        nb.setCategory(Notification.CATEGORY_ERROR);
-        mNotificationManager.notify(ID_STOP_BACKGROUND_WARNING, nb.build());
     }
 }

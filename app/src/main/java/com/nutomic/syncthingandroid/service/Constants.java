@@ -13,8 +13,6 @@ public class Constants {
 
     public static final String FILENAME_SYNCTHING_BINARY        = "libsyncthing.so";
 
-    // Preferences - Run conditions
-    public static final String PREF_START_SERVICE_ON_BOOT       = "always_run_in_background";
     // Preferences - Behaviour
     public static final String PREF_FIRST_START                 = "first_start";
     public static final String PREF_START_INTO_WEB_GUI          = "start_into_web_gui";

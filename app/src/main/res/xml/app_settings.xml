@@ -36,10 +36,7 @@
             android:title="@string/service_settings_title"
             android:summary="@string/service_settings_summary"/>
 
-        <CheckBoxPreference
-            android:key="always_run_in_background"
-            android:title="@string/run_as_background_service"
-            android:defaultValue="false" />
+        
 
     </PreferenceScreen>
 
