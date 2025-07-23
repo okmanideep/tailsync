@@ -27,6 +27,7 @@ project.properties
 *.ipr
 *.iws
 .idea/
+.kotlin/
 
 # Misc IDE stuff
 eclipse-java-style.xml

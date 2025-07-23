@@ -1,8 +1,7 @@
-import org.gradle.configurationcache.extensions.capitalized
-
 plugins {
     id("com.android.application")
     kotlin("android")
+    id("com.google.devtools.ksp") version "2.1.20-2.0.1"
     id("com.github.ben-manes.versions")
     id("com.github.triplet.play") version "3.7.0"
 }
@@ -24,7 +23,7 @@ dependencies {
 
     implementation("androidx.constraintlayout:constraintlayout:2.0.4")
     implementation("com.google.dagger:dagger:2.49")
-    annotationProcessor("com.google.dagger:dagger-compiler:2.49")
+    ksp("com.google.dagger:dagger-compiler:2.49")
     androidTestImplementation("androidx.test:rules:1.4.0")
     androidTestImplementation("androidx.annotation:annotation:1.2.0")
 }

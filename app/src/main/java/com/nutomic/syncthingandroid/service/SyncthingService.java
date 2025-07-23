@@ -517,6 +517,7 @@ public class SyncthingService extends Service {
     private void onServiceStateChange(State newState) {
         Log.v(TAG, "onServiceStateChange: from " + mCurrentState + " to " + newState);
         mCurrentState = newState;
+        Notifier.onStateChanged(newState);
         mHandler.post(() -> {
             mNotificationHandler.updatePersistentNotification(this);
             for (Iterator<OnServiceStateChangeListener> i = mOnServiceStateChangeListeners.iterator();
