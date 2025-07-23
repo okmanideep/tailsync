@@ -18,6 +18,7 @@ import com.nutomic.syncthingandroid.SyncthingApp;
 import com.nutomic.syncthingandroid.activities.FirstStartActivity;
 import com.nutomic.syncthingandroid.activities.LogActivity;
 import com.nutomic.syncthingandroid.activities.MainActivity;
+import com.nutomic.syncthingandroid.receiver.AppConfigReceiver;
 import com.nutomic.syncthingandroid.service.Constants;
 import com.nutomic.syncthingandroid.service.SyncthingService.State;
 
@@ -100,7 +101,7 @@ public class NotificationHandler {
         boolean startServiceOnBoot = mPreferences.getBoolean(Constants.PREF_START_SERVICE_ON_BOOT, false);
         State currentServiceState = service.getCurrentState();
         boolean syncthingRunning = currentServiceState == SyncthingService.State.ACTIVE ||
-                    currentServiceState == SyncthingService.State.STARTING;
+                currentServiceState == SyncthingService.State.STARTING;
         boolean startForegroundService = false;
         if (!appShutdownInProgress) {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
@@ -121,7 +122,7 @@ public class NotificationHandler {
                  * Foreground priority requires a notification so this ensures that we either have a
                  * "default" or "low_priority" notification, but not "none".
                  */
-                 startForegroundService = true;
+                startForegroundService = true;
             }
         }
 
@@ -167,6 +168,16 @@ public class NotificationHandler {
                 .setOnlyAlertOnce(true)
                 .setPriority(NotificationCompat.PRIORITY_MIN)
                 .setContentIntent(PendingIntent.getActivity(mContext, 0, intent, Constants.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT));
+
+        if (currentServiceState == State.ACTIVE) {
+            Intent stopIntent = new Intent(mContext, AppConfigReceiver.class)
+                    .setAction("com.nutomic.syncthingandroid.action.STOP");
+            PendingIntent pendingStopIntent = PendingIntent.getBroadcast(
+                    mContext, 0, stopIntent, Constants.FLAG_IMMUTABLE);
+            builder.addAction(R.drawable.ic_close_24dp,
+                    mContext.getString(R.string.exit), pendingStopIntent);
+        }
+
         if (!appShutdownInProgress) {
             if (startForegroundService) {
                 Log.v(TAG, "Starting foreground service or updating notification");
