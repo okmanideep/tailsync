@@ -54,10 +54,10 @@ android {
 
     signingConfigs {
         create("release") {
-            storeFile = System.getenv("SYNCTHING_RELEASE_STORE_FILE")?.let(::file)
-            storePassword = System.getenv("SIGNING_PASSWORD")
-            keyAlias = System.getenv("SYNCTHING_RELEASE_KEY_ALIAS")
-            keyPassword = System.getenv("SIGNING_PASSWORD")
+            storeFile = System.getenv("TAILSYNC_RELEASE_STORE_FILE")?.let(::file)
+            storePassword = System.getenv("TAILSYNC_SIGNING_PASSWORD")
+            keyAlias = System.getenv("TAILSYNC_RELEASE_KEY_ALIAS")
+            keyPassword = System.getenv("TAILSYNC_SIGNING_PASSWORD")
         }
     }
 
